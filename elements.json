@@ -133,6 +133,61 @@
       "electron_configuration_semantic": "[Ne] 3s²"
     },
     {
+      "name": "Aluminum",
+      "symbol": "Al",
+      "number": 13,
+      "atomic_mass": 26.9815385,
+      "category": "post-transition metal",
+      "xpos": 13,
+      "ypos": 3,
+      "shells": [2, 8, 3],
+      "electron_configuration_semantic": "[Ne] 3s² 3p¹"
+    },
+    {
+      "name": "Silicon",
+      "symbol": "Si",
+      "number": 14,
+      "atomic_mass": 28.085,
+      "category": "metalloid",
+      "xpos": 14,
+      "ypos": 3,
+      "shells": [2, 8, 4],
+      "electron_configuration_semantic": "[Ne] 3s² 3p²"
+    },
+    {
+      "name": "Phosphorus",
+      "symbol": "P",
+      "number": 15,
+      "atomic_mass": 30.973761998,
+      "category": "polyatomic nonmetal",
+      "xpos": 15,
+      "ypos": 3,
+      "shells": [2, 8, 5],
+      "electron_configuration_semantic": "[Ne] 3s² 3p³"
+    },
+    {
+      "name": "Sulfur",
+      "symbol": "S",
+      "number": 16,
+      "atomic_mass": 32.06,
+      "category": "polyatomic nonmetal",
+      "xpos": 16,
+      "ypos": 3,
+      "shells": [2, 8, 6],
+      "electron_configuration_semantic": "[Ne] 3s² 3p⁴"
+    },
+    {
+      "name": "Chlorine",
+      "symbol": "Cl",
+      "number": 17,
+      "atomic_mass": 35.45,
+      "category": "diatomic nonmetal",
+      "xpos": 17,
+      "ypos": 3,
+      "shells": [2, 8, 7],
+      "electron_configuration_semantic": "[Ne] 3s² 3p⁵"
+    },
+    {
       "name": "Argon",
       "symbol": "Ar",
       "number": 18,

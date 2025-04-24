@@ -4,16 +4,21 @@ let elements = []; // Array to hold Element objects
 
 // --- Layout and Styling ---
 const GRID_COLS = 18;
-const GRID_ROWS = 7; // Main table rows (adjust if including Lanthanides/Actinides separately)
+const GRID_ROWS_MAIN = 7; // Main table rows (Periods 1-7)
+const GRID_ROWS_LOWER = 2; // Lanthanides/Actinides block
+const LOWER_BLOCK_Y_START = 9; // The ypos value in JSON for the lower block start (typically 8 for L, 9 for A)
+const LOWER_BLOCK_SCREEN_ROW_OFFSET = 2; // Number of rows to offset the lower block visually
+
 let cellSize = 50;
 let marginX, marginY; // Calculated margins for centering
+let tableWidth, tableHeight;
 
 // --- Colors ---
 let categoryColors;
 
 // --- Animation ---
 let atomCenterX, atomCenterY;
-let atomRadius = 150;
+let atomRadius = 150; // Max radius for the outermost orbit
 let electronSize = 6;
 let nucleusSize = 15;
 let orbitColor;
@@ -25,6 +30,7 @@ let infoBoxX, infoBoxY, infoBoxW, infoBoxH;
 
 // --- Preload ---
 function preload() {
+  // Ensure the path 'elements.json' is correct relative to index.html
   elementsData = loadJSON("elements.json");
 }
 
@@ -34,24 +40,27 @@ function setup() {
   textFont("sans-serif");
 
   // Calculate cell size and margins based on window size
-  let tableWidth = GRID_COLS * cellSize;
-  let tableHeight = GRID_ROWS * cellSize;
-  // Try to fit based on width first
-  cellSize = floor((windowWidth * 0.8) / GRID_COLS);
+  // We need space for the main table + the lower block
+  let totalGridRowsVisual =
+    GRID_ROWS_MAIN + LOWER_BLOCK_SCREEN_ROW_OFFSET + GRID_ROWS_LOWER; // Total visual rows including gap
+
+  // Attempt to size based on width first
+  cellSize = floor((windowWidth * 0.9) / GRID_COLS);
   // If too tall, resize based on height
-  if (GRID_ROWS * cellSize > windowHeight * 0.7) {
-    cellSize = floor((windowHeight * 0.7) / GRID_ROWS);
+  if (totalGridRowsVisual * cellSize > windowHeight * 0.85) {
+    cellSize = floor((windowHeight * 0.85) / totalGridRowsVisual);
   }
-  // Minimum cell size
-  cellSize = max(25, cellSize);
+  // Minimum cell size to keep it usable
+  cellSize = max(30, cellSize);
 
   tableWidth = GRID_COLS * cellSize;
-  tableHeight = GRID_ROWS * cellSize;
+  tableHeight = GRID_ROWS_MAIN * cellSize;
+  let lowerBlockHeight = GRID_ROWS_LOWER * cellSize;
 
   marginX = (windowWidth - tableWidth) / 2;
   marginY = 50; // Top margin for title/info
 
-  // Define element colors (expand this!)
+  // Define element colors (expand this with all categories from your JSON!)
   categoryColors = {
     "diatomic nonmetal": color(120, 220, 120, 200), // Light green
     "noble gas": color(180, 160, 255, 200), // Light purple
@@ -64,14 +73,15 @@ function setup() {
     "transition metal": color(220, 180, 180, 200), // Light red/pink
     "post-transition metal": color(180, 180, 180, 200), // Grey
     unknown: color(230, 230, 230, 200), // Light Grey
-    default: color(200, 200, 200, 180), // Default Grey
+    default: color(200, 200, 200, 180), // Default Grey if category not found
   };
 
   orbitColor = color(100, 100, 100, 150);
-  electronColor = color(0, 0, 255);
-  nucleusColor = color(255, 0, 0);
+  electronColor = color(0, 0, 255); // Blue electrons
+  nucleusColor = color(255, 0, 0); // Red nucleus
 
   // Create Element objects from JSON data
+  elements = []; // Clear previous elements on resize
   if (elementsData && elementsData.elements) {
     elementsData.elements.forEach((data) => {
       elements.push(new Element(data));
@@ -79,33 +89,50 @@ function setup() {
   } else {
     console.error("Failed to load or parse elements.json");
     // Draw error message on screen
-    createP("Error: Could not load element data from elements.json").position(
-      20,
-      20
-    );
+    createP(
+      "Error: Could not load element data from elements.json. Make sure 'elements.json' exists in the same folder and is valid JSON."
+    ).position(20, 20);
   }
 
   // Define positions for info box and atom animation
-  infoBoxW = 250;
-  infoBoxH = 150;
-  infoBoxX = windowWidth - marginX - infoBoxW; // Top right
-  infoBoxY = marginY;
+  infoBoxW = min(300, windowWidth * 0.4); // Max width
+  infoBoxH = 200;
+  let spacing = 20;
 
-  atomCenterX = marginX + tableWidth / 2; // Center below table (adjust as needed)
-  atomCenterY = marginY + tableHeight + atomRadius + 50; // Below table
+  // Place info box and atom side-by-side if space allows
+  if (windowWidth > tableWidth + infoBoxW + atomRadius * 2 + spacing * 4) {
+    // Wide screen: Place info box and atom to the right of the table
+    infoBoxX = marginX + tableWidth + spacing;
+    infoBoxY = marginY;
 
-  // Adjust atom center if info box overlaps or goes off screen
-  if (infoBoxX < marginX + tableWidth + 20) {
-    // If table is wide, place atom animation to the right
-    atomCenterX = marginX + tableWidth + atomRadius + 30;
-    atomCenterY = marginY + tableHeight / 2;
+    atomCenterX = infoBoxX + infoBoxW / 2; // Center atom below info box
+    atomCenterY = infoBoxY + infoBoxH + spacing + atomRadius;
+    // Alternative: Place atom side-by-side with info box
+    // atomCenterX = infoBoxX + infoBoxW + spacing + atomRadius;
+    // atomCenterY = marginY + tableHeight / 2;
+  } else {
+    // Narrow screen: Place info box and atom below the table
+    infoBoxX = marginX + tableWidth - infoBoxW; // Right-aligned below table
+    infoBoxY =
+      marginY +
+      tableHeight +
+      lowerBlockHeight +
+      spacing +
+      LOWER_BLOCK_SCREEN_ROW_OFFSET * cellSize;
+
+    atomCenterX = marginX + tableWidth / 2; // Centered horizontally
+    atomCenterY = infoBoxY + infoBoxH + spacing + atomRadius;
   }
-  if (atomCenterY + atomRadius > windowHeight - 20) {
-    // If too low, move it up or make radius smaller (simple move up here)
-    atomCenterY = windowHeight - atomRadius - 20;
-  }
-  // Ensure Info Box isn't off screen right
-  infoBoxX = min(infoBoxX, windowWidth - infoBoxW - 10);
+
+  // Ensure info box doesn't go off screen right
+  infoBoxX = min(infoBoxX, windowWidth - infoBoxW - spacing);
+  // Ensure info box doesn't go off screen left
+  infoBoxX = max(infoBoxX, spacing);
+  // Ensure atom doesn't go off screen
+  atomCenterX = max(atomCenterX, atomRadius + spacing);
+  atomCenterX = min(atomCenterX, windowWidth - atomRadius - spacing);
+  atomCenterY = max(atomCenterY, atomRadius + spacing);
+  atomCenterY = min(atomCenterY, windowHeight - atomRadius - spacing);
 }
 
 // --- Draw Loop ---
@@ -115,7 +142,7 @@ function draw() {
 
   // --- Draw Title ---
   fill(0);
-  textSize(24);
+  textSize(28);
   textAlign(CENTER, TOP);
   text("Dynamic Periodic Table", windowWidth / 2, 10);
 
@@ -127,7 +154,7 @@ function draw() {
     }
   });
 
-  // --- Draw Hover Highlight ---
+  // --- Draw Hover Highlight (drawn after all elements so it's on top) ---
   if (hoveredElement) {
     hoveredElement.highlight();
   }
@@ -139,11 +166,16 @@ function draw() {
   } else {
     // Optional: Display default text when nothing is hovered
     fill(150);
-    textSize(14);
+    textSize(16);
     textAlign(LEFT, TOP);
-    text("Hover over an element", infoBoxX + 10, infoBoxY + 10);
+    // Adjust default text position based on infoBox location
+    text(
+      "Hover over an element\nto see details and atom structure",
+      infoBoxX + 10,
+      infoBoxY + 10
+    );
 
-    // Optional: Maybe draw a generic atom placeholder?
+    // Optional: Draw a generic atom placeholder?
     // fill(200); noStroke();
     // ellipse(atomCenterX, atomCenterY, nucleusSize * 0.8, nucleusSize * 0.8);
   }
@@ -160,8 +192,18 @@ function windowResized() {
 class Element {
   constructor(data) {
     this.data = data; // Store all JSON data
+
+    // Calculate grid position, adjusting ypos for the lower block
+    let visualYpos = data.ypos;
+    if (data.ypos >= LOWER_BLOCK_Y_START) {
+      visualYpos =
+        GRID_ROWS_MAIN +
+        LOWER_BLOCK_SCREEN_ROW_OFFSET +
+        (data.ypos - LOWER_BLOCK_Y_START);
+    }
+
     this.x = marginX + (data.xpos - 1) * cellSize;
-    this.y = marginY + (data.ypos - 1) * cellSize;
+    this.y = marginY + (visualYpos - 1) * cellSize;
     this.size = cellSize;
     this.color = categoryColors[data.category] || categoryColors["default"];
   }
@@ -173,15 +215,15 @@ class Element {
     strokeWeight(1);
     rect(this.x, this.y, this.size, this.size, 4); // Slightly rounded corners
 
-    // Text (Symbol, Number)
-    textAlign(CENTER, CENTER);
+    // Text
+    fill(0); // Black text
 
     // Adjust text size based on cell size
     let symbolSize = this.size * 0.4;
     let numberSize = this.size * 0.2;
+    let nameSize = this.size * 0.15;
 
     // Draw Atomic Number (Top Left)
-    fill(0); // Black text
     textSize(numberSize);
     textAlign(LEFT, TOP);
     text(
@@ -193,14 +235,21 @@ class Element {
     // Draw Symbol (Center)
     textSize(symbolSize);
     textAlign(CENTER, CENTER);
-    // Check for long symbols if needed
-    if (this.data.symbol.length > 2) textSize(symbolSize * 0.7);
-    text(this.data.symbol, this.x + this.size / 2, this.y + this.size / 2);
+    // Adjust symbol size for long symbols if needed (e.g., Uuq)
+    if (this.data.symbol.length > 2) textSize(symbolSize * 0.8);
+    text(
+      this.data.symbol,
+      this.x + this.size / 2,
+      this.y + this.size / 2 + this.size * 0.05
+    ); // Slight vertical adjustment
 
-    // Draw Name (Bottom, smaller) - Optional, can get crowded
-    // textSize(numberSize * 0.9);
-    // textAlign(CENTER, BOTTOM);
-    // text(this.data.name, this.x + this.size / 2, this.y + this.size * 0.95);
+    // Draw Name (Bottom Center)
+    textSize(nameSize);
+    textAlign(CENTER, BOTTOM);
+    // Only draw name if cell is large enough
+    if (this.size > 40) {
+      text(this.data.name, this.x + this.size / 2, this.y + this.size * 0.95);
+    }
   }
 
   isHovered(mx, my) {
@@ -227,47 +276,70 @@ function displayElementInfo(element) {
   fill(255, 255, 255, 220); // Semi-transparent white
   stroke(50);
   strokeWeight(1);
-  rect(infoBoxX, infoBoxY, infoBoxW, infoBoxH, 5);
+  rect(infoBoxX, infoBoxY, infoBoxW, infoBoxH, 8); // Rounded corners
 
   // Display text
   fill(0); // Black text
   textAlign(LEFT, TOP);
   let txtSize = 14;
   let spacing = txtSize * 1.5;
-  let currentY = infoBoxY + 10;
-  let currentX = infoBoxX + 10;
+  let currentY = infoBoxY + 15;
+  let currentX = infoBoxX + 15;
 
-  textSize(txtSize + 2); // Slightly larger for name/symbol
+  textSize(txtSize + 4); // Larger for name/symbol
+  textStyle(BOLD);
   text(
     `${element.data.number}. ${element.data.name} (${element.data.symbol})`,
     currentX,
     currentY
   );
-  currentY += spacing * 1.2; // More space after title
+  textStyle(NORMAL);
+  currentY += spacing * 1.4; // More space after title
 
   textSize(txtSize);
-  text(
-    `Atomic Mass: ${element.data.atomic_mass.toFixed(3)}`,
-    currentX,
-    currentY
-  );
-  currentY += spacing;
+  if (element.data.atomic_mass) {
+    // Check if mass data exists
+    text(
+      `Atomic Mass: ${parseFloat(element.data.atomic_mass).toFixed(3)} u`,
+      currentX,
+      currentY
+    );
+    currentY += spacing;
+  } else {
+    text(`Atomic Mass: Unknown`, currentX, currentY);
+    currentY += spacing;
+  }
 
-  text(`Category: ${element.data.category}`, currentX, currentY);
-  currentY += spacing;
+  if (element.data.category) {
+    text(`Category: ${element.data.category}`, currentX, currentY);
+    currentY += spacing;
+  } else {
+    text(`Category: Unknown`, currentX, currentY);
+    currentY += spacing;
+  }
 
   text(`Electron Config:`, currentX, currentY);
   currentY += spacing * 0.9;
   textSize(txtSize * 0.9); // Smaller for config
-  text(
-    `${element.data.electron_configuration_semantic}`,
-    currentX + 5,
-    currentY
-  );
+  if (element.data.electron_configuration_semantic) {
+    text(
+      `${element.data.electron_configuration_semantic}`,
+      currentX + 5,
+      currentY
+    );
+  } else {
+    text(`Unknown`, currentX + 5, currentY);
+  }
+
   currentY += spacing;
 
-  textSize(txtSize * 0.9); // Smaller for shell config
-  text(`Shells: ${element.data.shells.join(", ")}`, currentX + 5, currentY);
+  if (element.data.shells && element.data.shells.length > 0) {
+    textSize(txtSize * 0.9); // Smaller for shell config
+    text(`Shells: ${element.data.shells.join(", ")}`, currentX + 5, currentY);
+  } else {
+    textSize(txtSize * 0.9);
+    text(`Shells: Unknown`, currentX + 5, currentY);
+  }
 }
 
 // --- Draw Atom Animation ---
@@ -281,21 +353,32 @@ function drawAtom(element) {
   noStroke();
   ellipse(0, 0, nucleusSize, nucleusSize);
   // Optional: Text inside nucleus (atomic number or symbol)
-  fill(255);
+  fill(255); // White text for nucleus
   textSize(nucleusSize * 0.6);
   textAlign(CENTER, CENTER);
-  text(element.data.symbol, 0, 1); // Slight Y offset looks better
+  text(element.data.symbol, 0, 1); // Slight Y offset often looks better centered visually
 
   // Draw Orbits and Electrons
   let shells = element.data.shells;
-  let maxRadius = 0; // Track the largest radius drawn
+  if (!shells || shells.length === 0) {
+    // Draw a simple nucleus with no shells if data is missing/empty
+    textSize(12);
+    fill(50);
+    textAlign(CENTER, TOP);
+    text("No shell data", 0, nucleusSize / 2 + 5);
+    pop();
+    return; // Exit the function
+  }
+
+  // Calculate spacing between orbits - adjust the multiplier for tighter/looser packing
+  let orbitSpacing = (atomRadius - nucleusSize / 2) / shells.length;
+  orbitSpacing = max(orbitSpacing, electronSize * 2.5); // Minimum spacing
 
   for (let i = 0; i < shells.length; i++) {
     let numElectrons = shells[i];
-    if (numElectrons === 0) continue; // Skip empty shells
+    if (numElectrons === 0) continue; // Skip shells with no electrons
 
-    let shellRadius = nucleusSize + 15 + i * (atomRadius * 0.15); // Adjust spacing
-    maxRadius = shellRadius;
+    let shellRadius = nucleusSize / 2 + (i + 1) * orbitSpacing; // Radius for this orbit
 
     // Draw Orbit Path
     noFill();
@@ -306,7 +389,10 @@ function drawAtom(element) {
     // Calculate electron positions
     fill(electronColor);
     noStroke();
-    let baseAngle = (frameCount * (0.01 + i * 0.002)) % TWO_PI; // Rotate faster for inner shells
+    // Animation speed: Faster for inner shells, slower for outer
+    // frameCount controls the overall rotation, multiplier controls relative speed
+    let animationSpeed = map(i, 0, shells.length - 1, 0.02, 0.005); // Faster inner, slower outer
+    let baseAngle = (frameCount * animationSpeed) % TWO_PI;
     let angleIncrement = TWO_PI / numElectrons;
 
     for (let j = 0; j < numElectrons; j++) {
@@ -316,9 +402,6 @@ function drawAtom(element) {
       ellipse(ex, ey, electronSize, electronSize);
     }
   }
-  // Optional: Draw an outer boundary circle based on max radius
-  // noFill(); stroke(0, 50); strokeWeight(0.5);
-  // ellipse(0, 0, (maxRadius + electronSize) * 2, (maxRadius + electronSize) * 2);
 
   pop(); // Restore previous drawing state
 }
